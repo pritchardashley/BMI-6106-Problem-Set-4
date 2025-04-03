@@ -1,0 +1,168 @@
+---
+title: "Problem Set 4 Due Date Wednesday April 2rd"
+output: 
+  html_document:
+    toc: true # table of content true
+    toc_depth: 2  # upto three depths of headings (specified by #, ## and ###)
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+    df_print: paged
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#### We would like to include some instructions regarding submission of problem sets to be able to fairly, consistently and efficiently grade your assignments.
+
+#### 1. Please submit just one document this document can be an .R script or a format that allows evaluation of your code and data (Jupyter, python script, etc) with all the necessary text (answers, discussions, analysis) which can be added to the script as comments (remember that a comment starts with the # symbol in R)
+
+#### 2.Once you have solved a problem with the code and the result needs to be printed by just calling the variable created. For example, if you are calculating the mean of a distribution and save the result as variable a = mean(x) then the next line needs to be a call to a, either print(a) or just a, so that when we run the code to check on your work we can evaluate your responses correctly.
+
+#### 3.The final answer needs to be written down as a comment; just having the final number as an answer will result in point deductions as in most cases the question is not asking for a number but for a statistical analysis. Eg. The t-test had a p-value of 0.001 t = 4.6 n = 30 (this is the correct way to present the results from a t-test, you can also include the 95CI), which indicates that we reject the null hypothesis that the mean blood pressure in treatment 1 is the same as in the placebo group.
+
+#### 4.We will not accept screenshots of code or results.
+
+#### 5.If there are plots in the results, you don’t need to print the plots using a different document, just have the code and we will run it and see the plot that you created.
+
+#### 6.It is ok to work together and copy code from exercises, peers, class examples, etc, but it is not ok to copy identical workflows and answers from classmates. Copying another’s answers verbatim is considered plagiarism and will result in a zero for the assignment as well as other potential consequences according to Program and University guidelines. It is ok to use LLMs to help with the code, but not for the analysis, this should be your own.
+
+#### 7.The penalty for turning in a late assignment is 10% reduction in grade per day (see course syllabus). 
+
+### How long will a person live? The life expectancy dataset provided by WHO (World Health Organization) is an attempt to answer this question:
+
+#### Independent Variables (predictors)
+
+#### Adult.Mortality
+#### infant.deaths
+#### Alcohol
+#### percentage.expenditure
+#### Hepatitis.B
+#### Measles
+#### BMI
+#### under.five.deaths
+#### Polio
+#### Total.expenditure
+#### Diphtheria
+#### HIV.AIDS
+#### GDP
+#### Population
+#### Income.composition.of.resources
+#### Schooling
+
+### Outcome (dependent variable)
+
+#### Life.expectancy 
+
+## Problem Set 4 (100 points)
+
+#### We are going to use the life expectancy dataset to generate a linear model that predicts life expectancy using the 16 predictors from the dataset
+
+#### This data has been subsetted to include only continuous data.
+
+``` {r}
+#Import Files
+
+setwd("/Users/ashleypritchard/Desktop/BMI 6106")
+list.files()
+
+life = read.table("Life_Expectancy_Data.csv", sep = ",", header = TRUE)
+head(life)
+
+library(moments)
+library(caret)
+library(car)
+
+```
+
+
+#### Because this data contains missing data we are going to impute the dataset by using the means of each column. Imputation is the process of replacing missing data with some value. There are many techniques for imputation, but we are going to simply add the median of the column to each missing data, that way we wouldn’t be creating a statistical bias by skewing the distribution. 
+
+```{r impute}
+##mean imputation
+for(i in 1:ncol(life)) {
+  life[ , i][is.na(life[ , i])] <- median(life[ , i], na.rm=TRUE)
+}
+
+life
+```
+
+## Premise
+### Your job for this assignment is to use the statistical tools seen in class to evaluate and find the best model (best predictors and their combination) that best explains the outcome variable. The assignment will be divided into three sections:
+
+#### This exercise is open ended, no correct answer, so what are we looking for in the responses?:
+
+## 1. Data Exploration (Introduction - Methods) (30 points)
+### Do a short data exploration of this dataset. Describe the most problematic aspects of the data (deviations from normality, colliniearity, skewness, etc) that could potentially affect and bias the analysis.
+
+```{r}
+#1
+
+summary(life)
+
+hist(life$Adult.Mortality, main="Distribution of Adult Mortality", xlab="Adult Mortality", col="lightblue", border="black")
+
+
+hist(life$BMI, main="Distribution of BMI", xlab="BMI", col="blue", border="black")
+
+hist(life$Total.expenditure, main="Distribution of Total Expenditure", xlab="Total Expenditure", col="blue", border="black")
+
+normality = apply(life[, sapply(life, is.numeric)], 2, function(x) shapiro.test(x)$p.value)
+normality
+    #All of the p-values are very small indicating that none of the variables are normally distributed.
+
+skewness = apply(life[, sapply(life, is.numeric)], 2, skewness, na.rm = TRUE)
+kurtosis = apply(life[, sapply(life, is.numeric)], 2, kurtosis, na.rm = TRUE)
+
+data.frame(Skewness = skewness, Kurtosis = kurtosis)
+    #The data is very skewed. Some of the right skewed variables are Measles, infant deaths, under 5 deaths, while left skewed variables are Hep B, and Polio. The only relatively normal ones are alchohol and total expenditures but those are still positively skewed (to the right)
+
+#The areas of concern that may cause bias in the analysis and affect the results are the majority of them. More specifically, Infant deaths, Measles, percentage expenditures, and under five deaths being highly positively skewed. In regards to the negatively skewed data that also brings concerns is Hep. B, BMI, and Polio. Although none of the data is normally distributed, the previously mentioned variables will have the greatest affects. 
+```
+## 2. Model Generation and Evaluation (Results) (35 points)
+### Use the tools described in class to generate a linear model that best fits the data. Remember that there are different ways to evaluate and compare the models and you have to make the decisions based on the data you have. You should use the metrics, scores and diagnostic plots that help evaluate the models seen in class.
+
+```{r}
+#2
+#Scale the data to get rid of skew
+
+  #right skewed
+life$Adult.Mortality = log(life$Adult.Mortality + 1)
+life$infant.deaths = log(life$infant.deaths + 1)
+life$percentage.expenditure = log(life$percentage.expenditure + 1)
+life$Measles = log(life$Measles + 1)
+life$under.five.deaths = log(life$under.five.deaths + 1)
+
+  #left skewed
+life$Hepatitis.B = log(max(life$Hepatitis.B) - life$Hepatitis.B + 1)
+life$Polio = log(max(life$Polio) - life$Polio + 1)
+
+normality = apply(life[, sapply(life, is.numeric)], 2, function(x) shapiro.test(x)$p.value)
+normality
+
+set.seed(80085)
+numeric_vars = life[, sapply(life, is.numeric)]
+
+#Fit linear model
+full_model = lm(Life.expectancy ~ ., data = life)
+summary(full_model)
+vif(full_model)
+
+
+#Better model
+full_model1 = lm(Life.expectancy ~ Adult.Mortality + under.five.deaths + HIV.AIDS + Polio + GDP + Measles + Hepatitis.B + BMI + Income.composition.of.resources + Schooling, data = life)
+summary(full_model1)
+
+vif(full_model1)
+```
+## 3. Analysis and Discussion (Conclusions) (35 points)
+### Generate a short report (a paragraph or two) about the main conclusions of your analysis, including the effect of the selected independent variables on life expectancy and under what criteria you chose those variables, and what is the interpretaion of the model you selected. Also, what kind of predictions and their utility you can make from your results.
+
+```{r}
+
+#After completing a linear model looking at the relationship that adult mortality, expenditure, hep b, BMI, deaths under 5, total expenditure, diphtheria, HIV/AIDs, GPD, population, income, and schooling have with ones life expectancy. For each variable including an intercept, the linear model provides a coefficient, standard error, t-value and a p-value. The model also provides an R squared value as well as an adjusted r-squared value, an F-statistic, and an overall p_value. The results of the model state that the variables that are not statistically relevant is infant deaths, alcohol, and population which all have a p-value greater than 0.05. All other variables do have a fantastically relevant effect on life expectancy regardless of whether the effect is minimal. The greatest factor that goes into live expectancy is adult mortality causes a decrease of almost half for the life expectancy for each mortality observation (is that the correct word?). Almost all other variables decrease or increase the live expectancy minimal amounts but they are significant regardless. I choose to do another model without the statistically significant variable and obtained an adjusted R-squared value of 0.76 which is a slight decrease from the previous model. The p-value is 2.2e-16 indicating that there is statistical significance. From completing a Vif test for both the first model and the second, there was some coliniarity present in the first model as seen for infant deaths and under five deaths. After repeating the test on the second model, there is no coliniarity. In conclusion, from this model we are able to better predict once life expectancy with the variables of, adult mortality, under five deaths, HIV/AIDS, polio, GDP, Measles, Hep B, BMI, income, and schooling, that all effect the life expectancy with significance either positely or negatively. 
+```
+
